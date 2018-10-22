@@ -120,6 +120,9 @@ def collect_participants(bids_dir, participant_label=None, strict=False):
 
 def collect_data(dataset, participant_label, task=None):
     """
+    SM: custom adjustments to allow for grabbing MP2RAGE image, as well as a T1map. These are not
+    part of the BIDS specification at the moment of writing.
+
     Uses grabbids to retrieve the input data for a given participant
 
     >>> bids_root, _ = collect_data('ds054', '100185')
@@ -166,6 +169,10 @@ def collect_data(dataset, participant_label, task=None):
                 'extensions': ['nii', 'nii.gz']},
         't1w': {'subject': participant_label, 'modality': 'anat', 'type': 'T1w',
                 'extensions': ['nii', 'nii.gz']},
+        't1map': {'subject': participant_label, 'modality': 'anat', 'type': 'T1map',
+                'extensions': ['nii', 'nii.gz']},
+        'MPRAGE': {'subject': participant_label, 'modality': 'anat', 'type': 'MPRAGE',
+                  'extensions': ['nii', 'nii.gz']},
         'roi': {'subject': participant_label, 'modality': 'anat', 'type': 'roi',
                 'extensions': ['nii', 'nii.gz']},
     }
@@ -195,6 +202,13 @@ def collect_data(dataset, participant_label, task=None):
 
     return subj_data, layout
 
+
+## SM ADJUSTED
+def get_second_inversion(fns):
+    """ This is a bit of a strange place for this function, maybe somewhere else? """
+    second_inversion = [x for x in fns if '_inv-2' in x]
+    return second_inversion[0]
+## END ADJUSTED
 
 def write_derivative_description(bids_dir, deriv_dir):
     from fmriprep import __version__
