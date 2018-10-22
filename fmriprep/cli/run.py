@@ -143,7 +143,8 @@ def get_parser():
         help='Do not use boundary-based registration (no goodness-of-fit checks)')
     g_conf.add_argument(
         '--template', required=False, action='store',
-        choices=['MNI152NLin2009cAsym'], default='MNI152NLin2009cAsym',
+        ### SM ADJUSTED: remove choices option, allow for any string.
+        #choices=['MNI152NLin2009cAsym'], default='MNI152NLin2009cAsym',
         help='volume template space (default: MNI152NLin2009cAsym)')
     g_conf.add_argument(
         '--output-grid-reference', required=False, action='store',
