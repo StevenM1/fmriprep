@@ -285,9 +285,12 @@ def init_func_preproc_wf(bold_file, ignore, freesurfer,
 
     # Switch stc off
     if multiecho and run_stc is True:
-        LOGGER.warning('Slice-timing correction is not available for '
-                       'multiecho BOLD data (not implemented).')
-        run_stc = False
+        ### ORIGINAL
+        # LOGGER.warning('Slice-timing correction is not available for '
+        #                'multiecho BOLD data (not implemented).')
+        # run_stc = False
+        ### SM ADJUSTED
+        LOGGER.warning('Slice-timing correction included for each echo separately. CHECK THESE RESULTS!')
 
     # Build workflow
     workflow = Workflow(name=wf_name)
@@ -553,12 +556,27 @@ Non-gridded (surface) resamplings were performed using `mri_vol2surf`
             (bold_reference_wf, boldbuffer, [
                 ('outputnode.bold_file', 'bold_file')]),
         ])
+
+        ### ORIGINAL
+        # workflow.connect([
+        #     (me_first_echo, bold_reference_wf, [
+        #         ('first_image', 'inputnode.bold_file')]),
+        #     (inputnode, boldbuffer, [
+        #         ('bold_file', 'bold_file')]),
+        # ])
+        ### SM ADJUSTED (add slice time correction per echo)
+        bold_stc_wf = init_bold_stc_wf(name='bold_stc_wf', metadata=metadata)
         workflow.connect([
             (me_first_echo, bold_reference_wf, [
                 ('first_image', 'inputnode.bold_file')]),
-            (inputnode, boldbuffer, [
-                ('bold_file', 'bold_file')]),
-        ])
+            (inputnode, bold_stc_wf, [
+                ('bold_file', 'inputnode.bold_file')]),
+            (bold_reference_wf, bold_stc_wf, [
+                ('outputnode.skip_vols', 'inputnode.skip_vols')]),
+            (bold_stc_wf, boldbuffer, [
+                ('outputnode.stc_file', 'bold_file')]),
+            ])
+        ### END ADJUSTED
 
         if t2s_coreg:
             # create a T2* map

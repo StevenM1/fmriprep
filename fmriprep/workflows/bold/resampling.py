@@ -260,8 +260,11 @@ generating a *preprocessed BOLD run in {tpl} space*.
 
     gen_ref = pe.Node(GenerateSamplingReference(), name='gen_ref',
                       mem_gb=0.3)  # 256x256x256 * 64 / 8 ~ 150MB)
-    template_str = TEMPLATE_MAP[template]
-    gen_ref.inputs.fixed_image = op.join(nid.get_dataset(template_str), '1mm_T1.nii.gz')
+    ### SM ADJUSTED: use custom template, assume located in /data/templates
+    # template_str = TEMPLATE_MAP[template]
+    # gen_ref.inputs.fixed_image = op.join(nid.get_dataset(template_str), '1mm_T1.nii.gz')
+    gen_ref.inputs.fixed_image = '/data/templates/' + template + '.nii.gz'
+    ### END ADJUSTED
 
     mask_mni_tfm = pe.Node(
         ApplyTransforms(interpolation='MultiLabel', float=True),
