@@ -77,7 +77,10 @@ class SubjectSummaryInputSpec(BaseInterfaceInputSpec):
                                         traits.List(File(exists=True))),
                           desc='BOLD functional series')
     output_spaces = traits.List(desc='Target spaces')
-    template = traits.Enum('MNI152NLin2009cAsym', desc='Template space')
+    ### ORIGINAL
+#    template = traits.Enum('MNI152NLin2009cAsym', desc='Template space')
+    ### SM ADJUSTED: allow for any string as template name.
+    template = traits.Str()
 
 
 class SubjectSummaryOutputSpec(SummaryOutputSpec):
