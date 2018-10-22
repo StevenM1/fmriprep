@@ -26,6 +26,14 @@ open-source software distribution.
 
 About
 -----
+This is a branch forked from fmriprep 1.1.6. The branch includes modifications that do the following:
+1. Process 7T anatomical data (MP2RAGE images - includes modifications to grab the second inversion and a created t1map; customized skull-stripping using nighres and a customized registration routine)
+2. Registration to a custom template
+3. Include slice-time correction for each echo separately (although I still need to consider whether this is actually a good idea)
+
+Note that the template argument should be a string. The code assumes theres a folder /data/templates/ (I run this inside a docker container to do this easily). The template argument should have the name of the template image, excluding the extension (which is assumed to be .nii.gz). E.g.:
+`-template my_custom_template` makes the code search for template /data/templates/my_custom_template.nii.gz. Obviously this is bad coding practice but I can't be bothered to make this nicer. Sorry.
+
 
 .. image:: https://github.com/oesteban/fmriprep/raw/38a63e9504ab67812b63813c5fe9af882109408e/docs/_static/fmriprep-workflow-all.png
 
