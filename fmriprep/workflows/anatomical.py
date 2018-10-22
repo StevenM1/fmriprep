@@ -415,6 +415,8 @@ and used as T1w-reference throughout the workflow.
         # t1_2_mni.inputs.template = template_str
         ### ADJUSTED SM (allow for custom template - we assume it's stored in /data/template).
         ref_img = '/data/templates/' + template + '.nii.gz'
+        t1_2_mni.inputs.target_img = ref_img
+        ### END ADJUSTED
 
         mni_mask.inputs.reference_image = ref_img
         mni_seg.inputs.reference_image = ref_img
