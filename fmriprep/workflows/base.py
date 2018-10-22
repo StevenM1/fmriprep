@@ -25,7 +25,7 @@ from ..interfaces import (
     BIDSDataGrabber, BIDSFreeSurferDir, BIDSInfo, SubjectSummary, AboutSummary,
     DerivativesDataSink
 )
-from ..utils.bids import collect_data
+from ..utils.bids import collect_data, get_second_inversion
 from ..utils.misc import fix_multi_T1w_source_name
 from ..__about__ import __version__
 
@@ -455,7 +455,10 @@ to workflows in *fMRIPrep*'s documentation]\
         (bidssrc, anat_preproc_wf, [('t1w', 'inputnode.t1w'),
                                     ('t2w', 'inputnode.t2w'),
                                     ('roi', 'inputnode.roi'),
-                                    ('flair', 'inputnode.flair')]),
+                                    ('flair', 'inputnode.flair'),
+                                    ### SM ADJUSTED: add t1map and mprage connections
+                                    ('t1map', 'inputnode.t1map'),
+                                    (('MPRAGE', get_second_inversion), 'inputnode.inv2')]),
         (summary, anat_preproc_wf, [('subject_id', 'inputnode.subject_id')]),
         (bidssrc, ds_report_summary, [(('t1w', fix_multi_T1w_source_name), 'source_file')]),
         (summary, ds_report_summary, [('out_report', 'in_file')]),

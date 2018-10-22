@@ -50,12 +50,13 @@ from ..interfaces import (
 )
 from ..utils.misc import fix_multi_T1w_source_name, add_suffix
 
+
 TEMPLATE_MAP = {
     'MNI152NLin2009cAsym': 'mni_icbm152_nlin_asym_09c',
     }
 
 
-#  pylint: disable=R0914
+# #  pylint: disable=R0914
 def init_anat_preproc_wf(skull_strip_template, output_spaces, template, debug,
                          freesurfer, longitudinal, omp_nthreads, hires, reportlets_dir,
                          output_dir, num_t1w,
@@ -217,9 +218,19 @@ and used as T1w-reference throughout the workflow.
         ants_ver=BrainExtraction().version or '<ver>'
     )
 
+    ### ORIGINAL
+    # inputnode = pe.Node(
+    #     niu.IdentityInterface(fields=['t1w', 't2w', 'roi', 'flair', 'subjects_dir', 'subject_id']),
+    #     name='inputnode')
+    ### ADJUSTED SM (added inv2, t1map for MP2RAGE)
     inputnode = pe.Node(
-        niu.IdentityInterface(fields=['t1w', 't2w', 'roi', 'flair', 'subjects_dir', 'subject_id']),
+        niu.IdentityInterface(fields=['t1w', 'inv2', 't1map', 't2w', 'roi', 'flair', 'subjects_dir', 'subject_id']),
         name='inputnode')
+
+    buffernode = pe.Node(niu.IdentityInterface(
+        fields=['t1_brain', 't1_mask']), name='buffernode')
+    ### END ADJUSTED
+
     outputnode = pe.Node(niu.IdentityInterface(
         fields=['t1_preproc', 't1_brain', 't1_mask', 't1_seg', 't1_tpms',
                 't1_2_mni', 't1_2_mni_forward_transform', 't1_2_mni_reverse_transform',
@@ -228,31 +239,84 @@ and used as T1w-reference throughout the workflow.
                 'subjects_dir', 'subject_id', 't1_2_fsnative_forward_transform',
                 't1_2_fsnative_reverse_transform', 'surfaces', 't1_aseg', 't1_aparc']),
         name='outputnode')
-
-    buffernode = pe.Node(niu.IdentityInterface(
-        fields=['t1_brain', 't1_mask']), name='buffernode')
-
     anat_template_wf = init_anat_template_wf(longitudinal=longitudinal, omp_nthreads=omp_nthreads,
                                              num_t1w=num_t1w)
 
     # 3. Skull-stripping
+    ### ORIGINAL
     # Bias field correction is handled in skull strip workflows.
-    skullstrip_ants_wf = init_skullstrip_ants_wf(name='skullstrip_ants_wf',
-                                                 skull_strip_template=skull_strip_template,
-                                                 debug=debug,
-                                                 omp_nthreads=omp_nthreads)
-
+    # skullstrip_ants_wf = init_skullstrip_ants_wf(name='skullstrip_ants_wf',
+    #                                              skull_strip_template=skull_strip_template,
+    #                                              debug=debug,
+    #                                              omp_nthreads=omp_nthreads)
+    # workflow.connect([
+    #     (inputnode, anat_template_wf, [('t1w', 'inputnode.t1w')]),
+    #     (anat_template_wf, skullstrip_ants_wf, [('outputnode.t1_template', 'inputnode.in_file')]),
+    #     (skullstrip_ants_wf, outputnode, [('outputnode.bias_corrected', 't1_preproc')]),
+    #     (anat_template_wf, outputnode, [
+    #         ('outputnode.template_transforms', 't1_template_transforms')]),
+    #     (buffernode, outputnode, [('t1_brain', 't1_brain'),
+    #                               ('t1_mask', 't1_mask')]),
+    # ])
+    ### ADJUSTED SM (added custom skull-stripping that works for MP2RAGE, based on nighres)
+    skull_stripper = pe.Node(niu.Function(input_names=['second_inversion', 't1_weighted', 't1_map'],
+                                          output_names=['brain_mask', 'inv2_masked', 't1w_masked', 't1map_masked'],
+                                          function=skull_strip), name='skstrp')
     workflow.connect([
         (inputnode, anat_template_wf, [('t1w', 'inputnode.t1w')]),
-        (anat_template_wf, skullstrip_ants_wf, [('outputnode.t1_template', 'inputnode.in_file')]),
-        (skullstrip_ants_wf, outputnode, [('outputnode.bias_corrected', 't1_preproc')]),
+        (inputnode, skull_stripper, [(('t1w', get_first), 't1_weighted'),
+                                     ('inv2', 'second_inversion'),
+                                     (('t1map', get_first), 't1_map')]),
+        (skull_stripper, outputnode, [('t1w_masked', 't1_preproc')]),
         (anat_template_wf, outputnode, [
             ('outputnode.template_transforms', 't1_template_transforms')]),
         (buffernode, outputnode, [('t1_brain', 't1_brain'),
                                   ('t1_mask', 't1_mask')]),
     ])
+    ### END ADJUSTED
+
 
     # 4. Surface reconstruction
+    ### ORIGINAL
+    # if freesurfer:
+    #     surface_recon_wf = init_surface_recon_wf(name='surface_recon_wf',
+    #                                              omp_nthreads=omp_nthreads, hires=hires)
+    #     applyrefined = pe.Node(fsl.ApplyMask(), name='applyrefined')
+    #     workflow.connect([
+    #         (inputnode, surface_recon_wf, [
+    #             ('t2w', 'inputnode.t2w'),
+    #             ('flair', 'inputnode.flair'),
+    #             ('subjects_dir', 'inputnode.subjects_dir'),
+    #             ('subject_id', 'inputnode.subject_id')]),
+    #         (anat_template_wf, surface_recon_wf, [('outputnode.t1_template', 'inputnode.t1w')]),
+    #         (skullstrip_ants_wf, surface_recon_wf, [
+    #             ('outputnode.out_file', 'inputnode.skullstripped_t1'),
+    #             ('outputnode.out_segs', 'inputnode.ants_segs'),
+    #             ('outputnode.bias_corrected', 'inputnode.corrected_t1')]),
+    #         (skullstrip_ants_wf, applyrefined, [
+    #             ('outputnode.bias_corrected', 'in_file')]),
+    #         (surface_recon_wf, applyrefined, [
+    #             ('outputnode.out_brainmask', 'mask_file')]),
+    #         (surface_recon_wf, outputnode, [
+    #             ('outputnode.subjects_dir', 'subjects_dir'),
+    #             ('outputnode.subject_id', 'subject_id'),
+    #             ('outputnode.t1_2_fsnative_forward_transform', 't1_2_fsnative_forward_transform'),
+    #             ('outputnode.t1_2_fsnative_reverse_transform', 't1_2_fsnative_reverse_transform'),
+    #             ('outputnode.surfaces', 'surfaces'),
+    #             ('outputnode.out_aseg', 't1_aseg'),
+    #             ('outputnode.out_aparc', 't1_aparc')]),
+    #         (applyrefined, buffernode, [('out_file', 't1_brain')]),
+    #         (surface_recon_wf, buffernode, [
+    #             ('outputnode.out_brainmask', 't1_mask')]),
+    #     ])
+    # else:
+    #     workflow.connect([
+    #         (skullstrip_ants_wf, buffernode, [
+    #             ('outputnode.out_file', 't1_brain'),
+    #             ('outputnode.out_mask', 't1_mask')]),
+    #     ])
+    ### ADJUSTED SM (WARNING: untested; I don't use surface reconstruction). Adjustment connect customized
+    # skull_stripper
     if freesurfer:
         surface_recon_wf = init_surface_recon_wf(name='surface_recon_wf',
                                                  omp_nthreads=omp_nthreads, hires=hires)
@@ -264,11 +328,11 @@ and used as T1w-reference throughout the workflow.
                 ('subjects_dir', 'inputnode.subjects_dir'),
                 ('subject_id', 'inputnode.subject_id')]),
             (anat_template_wf, surface_recon_wf, [('outputnode.t1_template', 'inputnode.t1w')]),
-            (skullstrip_ants_wf, surface_recon_wf, [
+            (skull_stripper, surface_recon_wf, [
                 ('outputnode.out_file', 'inputnode.skullstripped_t1'),
                 ('outputnode.out_segs', 'inputnode.ants_segs'),
                 ('outputnode.bias_corrected', 'inputnode.corrected_t1')]),
-            (skullstrip_ants_wf, applyrefined, [
+            (skull_stripper, applyrefined, [
                 ('outputnode.bias_corrected', 'in_file')]),
             (surface_recon_wf, applyrefined, [
                 ('outputnode.out_brainmask', 'mask_file')]),
@@ -286,10 +350,11 @@ and used as T1w-reference throughout the workflow.
         ])
     else:
         workflow.connect([
-            (skullstrip_ants_wf, buffernode, [
-                ('outputnode.out_file', 't1_brain'),
-                ('outputnode.out_mask', 't1_mask')]),
+            (skull_stripper, buffernode, [
+                ('t1w_masked', 't1_brain'),
+                ('brain_mask', 't1_mask')]),
         ])
+    ### END ADJUSTED
 
     # 5. Segmentation
     t1_seg = pe.Node(fsl.FAST(segments=True, no_bias=True, probability_maps=True),
@@ -302,16 +367,25 @@ and used as T1w-reference throughout the workflow.
     ])
 
     # 6. Spatial normalization (T1w to MNI registration)
-    t1_2_mni = pe.Node(
-        RobustMNINormalizationRPT(
-            float=True,
-            generate_report=True,
-            flavor='testing' if debug else 'precise',
-        ),
-        name='t1_2_mni',
-        n_procs=omp_nthreads,
-        mem_gb=2
-    )
+    ### ORIGINAL
+    # t1_2_mni = pe.Node(
+    #     RobustMNINormalizationRPT(
+    #         float=True,
+    #         generate_report=True,
+    #         flavor='testing' if debug else 'precise',
+    #     ),
+    #     name='t1_2_mni',
+    #     n_procs=omp_nthreads,
+    #     mem_gb=2
+    # )
+    ### ADJUSTED SM (use nighres embedded_ants registration routine)
+    t1_2_mni = pe.Node(niu.Function(input_names=['source_img', 'target_img'],
+                                        output_names=['transformed_source', 'mapping', 'inverse', 'out_report'],
+                                        function=register_func),
+                       name='calculate_warp',
+                       n_procs=omp_nthreads,
+                       mem_gb=25)  # 25GB is an educated guess based on ~12% usage on carcajou
+    ### END ADJUSTED
 
     # Resample the brain mask and the tissue probability maps into mni space
     mni_mask = pe.Node(
@@ -334,28 +408,35 @@ and used as T1w-reference throughout the workflow.
     )
 
     if 'template' in output_spaces:
-        template_str = TEMPLATE_MAP[template]
-        ref_img = op.join(nid.get_dataset(template_str), '1mm_T1.nii.gz')
+        ### ORIGINAL
+        # template_str = TEMPLATE_MAP[template]
+        # ref_img = op.join(nid.get_dataset(template_str), '1mm_T1.nii.gz')
+        #
+        # t1_2_mni.inputs.template = template_str
+        ### ADJUSTED SM (allow for custom template - we assume it's stored in /data/template).
+        ref_img = '/data/templates/' + template + '.nii.gz'
 
-        t1_2_mni.inputs.template = template_str
         mni_mask.inputs.reference_image = ref_img
         mni_seg.inputs.reference_image = ref_img
         mni_tpms.inputs.reference_image = ref_img
 
         workflow.connect([
             (inputnode, t1_2_mni, [('roi', 'lesion_mask')]),
-            (skullstrip_ants_wf, t1_2_mni, [('outputnode.bias_corrected', 'moving_image')]),
-            (buffernode, t1_2_mni, [('t1_mask', 'moving_mask')]),
+            ### ADJUSTED SM (customized registration requires different inputs)
+            # (skullstrip_ants_wf, t1_2_mni, [('outputnode.bias_corrected', 'moving_image')]),
+            # (buffernode, t1_2_mni, [('t1_mask', 'moving_mask')]),
+            (skull_stripper, t1_2_mni, [('t1w_masked', 'source_img')]),
+            ### END ADJUSTED
             (buffernode, mni_mask, [('t1_mask', 'input_image')]),
-            (t1_2_mni, mni_mask, [('composite_transform', 'transforms')]),
+            (t1_2_mni, mni_mask, [('mapping', 'transforms')]),  # SM: adjusted output name
             (t1_seg, mni_seg, [('tissue_class_map', 'input_image')]),
-            (t1_2_mni, mni_seg, [('composite_transform', 'transforms')]),
+            (t1_2_mni, mni_seg, [('mapping', 'transforms')]),  # SM: adjusted output name
             (t1_seg, mni_tpms, [('probability_maps', 'input_image')]),
-            (t1_2_mni, mni_tpms, [('composite_transform', 'transforms')]),
+            (t1_2_mni, mni_tpms, [('mapping', 'transforms')]),  # SM: adjusted output name
             (t1_2_mni, outputnode, [
-                ('warped_image', 't1_2_mni'),
-                ('composite_transform', 't1_2_mni_forward_transform'),
-                ('inverse_composite_transform', 't1_2_mni_reverse_transform')]),
+                ('transformed_source', 't1_2_mni'),  # SM: adjusted output name
+                ('mapping', 't1_2_mni_forward_transform'),  # SM: adjusted output name
+                ('inverse', 't1_2_mni_reverse_transform')]),  # SM: adjusted output name
             (mni_mask, outputnode, [('output_image', 'mni_mask')]),
             (mni_seg, outputnode, [('output_image', 'mni_seg')]),
             (mni_tpms, outputnode, [('output_image', 'mni_tpms')]),
@@ -1366,3 +1447,118 @@ def _seg2msks(in_file, newpath=None):
         nii.__class__(ldata, nii.affine, nii.header).to_filename(out_files[-1])
 
     return out_files
+
+
+### SM: the following functions allow for skull stripping & registration
+def get_first(x):
+    if isinstance(x, list):
+        return x[0]
+    else:
+        return x
+
+
+def skull_strip(second_inversion, t1_weighted, t1_map):
+    """ Wrapper function for nighres.brain.mp2rage_skullstripping for compatibility with nipype """
+    import nighres
+    import os
+    import nibabel as nib
+    file_name = os.path.basename(t1_weighted).split('_T1w')[0]
+
+    res = nighres.brain.mp2rage_skullstripping(second_inversion, t1_weighted, t1_map,
+                                               save_data=True)  # save manually
+
+    fn_dict = {}
+    for key, val in res.items():
+        nib.save(val, os.path.abspath('./' + file_name + '_' + key.replace('_', '-') + '.nii.gz'))
+        fn_dict[key] = os.path.abspath('./' + file_name + '_' + key.replace('_', '-') + '.nii.gz')
+    # print(fn_dict)
+
+    return fn_dict['brain_mask'], fn_dict['inv2_masked'], fn_dict['t1w_masked'], fn_dict['t1map_masked']
+
+
+def register_func(source_img, target_img, run_rigid=True, run_syn=True, run_affine=True, compress_report=False, *args):
+    """ Wrapper function for nighres.registration.embedded_antsreg for compatibility with nipype.
+    *args is allowed as input so that any arguments usually used in the fmriprep-anatomical pipeline don't cause
+    errors. They are not used.
+    """
+    import nighres
+    import os
+    import nibabel as nib
+
+    file_name = os.path.basename(source_img)
+    syn_results = nighres.registration.embedded_antsreg(
+        source_image=source_img,
+        target_image=target_img,
+        run_rigid=run_rigid, run_syn=run_syn, run_affine=run_affine,
+        cost_function='MutualInformation',
+        interpolation='NearestNeighbor',
+        save_data=False, overwrite=False)
+
+    # save manually
+    fn_dict = {}
+    for key, val in syn_results.items():
+        nib.save(val, os.path.abspath('./' + file_name + '_' + key.replace('_', '-') + '.nii.gz'))
+        fn_dict[key] = os.path.abspath('./' + file_name + '_' + key.replace('_', '-') + '.nii.gz')
+
+    inv = fn_dict['inverse']
+    trans_source = fn_dict['transformed_source']
+    mapping = fn_dict['mapping']
+
+    ## make a nice report for fmriprep ##
+    from nipype.interfaces.base import File
+    _fixed_image = target_img
+    _moving_image = trans_source  # source_img
+    _fixed_image_mask = None
+    _fixed_image_label = "fixed"
+    _moving_image_label = "moving"
+    _contour = None
+    #    _out_report = File('report.svg', usedefault=True, desc='filename for the visual report')#'report.svg'
+    _out_report = os.path.abspath(os.path.join(os.getcwd(), 'report.svg'))
+
+    from niworkflows.viz.utils import plot_registration, compose_view, cuts_from_bbox
+    from nilearn.masking import apply_mask, unmask
+    from nilearn.image import threshold_img, load_img
+
+    fixed_image_nii = load_img(_fixed_image)  # template
+    moving_image_nii = load_img(_moving_image)  # source
+    contour_nii = load_img(_contour) if _contour is not None else None
+
+    if _fixed_image_mask:
+        fixed_image_nii = unmask(apply_mask(fixed_image_nii,
+                                            _fixed_image_mask),
+                                 _fixed_image_mask)
+        # since the moving image is already in the fixed image space we
+        # should apply the same mask
+        moving_image_nii = unmask(apply_mask(moving_image_nii,
+                                             _fixed_image_mask),
+                                  _fixed_image_mask)
+        mask_nii = load_img(_fixed_image_mask)
+    else:
+        mask_nii = threshold_img(fixed_image_nii, 1e-3)
+
+    n_cuts = 7
+    if not _fixed_image_mask and contour_nii:
+        cuts = cuts_from_bbox(contour_nii, cuts=n_cuts)
+    else:
+        cuts = cuts_from_bbox(mask_nii, cuts=n_cuts)
+
+    # Call composer
+    compose_view(
+        plot_registration(fixed_image_nii, 'fixed-image',
+                          estimate_brightness=True,
+                          cuts=cuts,
+                          label=_fixed_image_label,
+                          contour=contour_nii,
+                          compress=compress_report),
+        plot_registration(moving_image_nii, 'moving-image',
+                          estimate_brightness=True,
+                          cuts=cuts,
+                          label=_moving_image_label,
+                          contour=contour_nii,
+                          compress=compress_report),
+        out_file=_out_report
+    )
+    print(inv)
+    print(trans_source)
+    print(mapping)
+    return trans_source, mapping, inv, _out_report
