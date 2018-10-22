@@ -154,7 +154,7 @@ class BIDSDataGrabber(SimpleInterface):
                 self.inputs.subject_id))
 
         ### SM ADJUSTED: added MPRAGE and t1map in the imtypes list
-        for imtype in ['bold', 't2w', 'flair', 'fmap', 'sbref', 'roi', 'MPRAGE' 't1map']:
+        for imtype in ['bold', 't2w', 'flair', 'fmap', 'sbref', 'roi', 'MPRAGE', 't1map']:
             if not bids_dict[imtype]:
                 LOGGER.warn('No \'{}\' images found for sub-{}'.format(
                     imtype, self.inputs.subject_id))
