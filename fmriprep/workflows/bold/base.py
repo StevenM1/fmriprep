@@ -410,7 +410,8 @@ Non-gridded (surface) resamplings were performed using `mri_vol2surf`
     )
 
     # SLICE-TIME CORRECTION (or bypass) #############################################
-    if run_stc is True:  # bool('TooShort') == True, so check True explicitly
+#    if run_stc is True:  # bool('TooShort') == True, so check True explicitly
+    if run_stc is True and not multiecho:  # SM: ensure NOT to run this when multiecho
         bold_stc_wf = init_bold_stc_wf(name='bold_stc_wf', metadata=metadata)
         workflow.connect([
             (bold_reference_wf, bold_stc_wf, [('outputnode.bold_file', 'inputnode.bold_file'),
