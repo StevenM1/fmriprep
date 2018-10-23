@@ -383,7 +383,6 @@ and used as T1w-reference throughout the workflow.
                                         output_names=['transformed_source', 'mapping', 'inverse', 'out_report'],
                                         function=register_func),
                        name='calculate_warp',
-                       n_procs=omp_nthreads,
                        mem_gb=25)  # 25GB is an educated guess based on ~12% usage on carcajou
     ### END ADJUSTED
 
