@@ -221,6 +221,7 @@ def init_bold_mni_trans_wf(template, mem_gb, omp_nthreads,
             List of affine transforms aligning each volume to ``ref_image`` in ITK format
         fieldwarp
             a :abbr:`DFM (displacements field map)` in ITK format
+        ## ToDo: add itk_bold_to_t1_bbr_refine
 
     **Outputs**
 

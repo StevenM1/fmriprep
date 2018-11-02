@@ -53,6 +53,7 @@ def init_func_preproc_wf(bold_file, ignore, freesurfer,
                          use_aroma, ignore_aroma_err, aroma_melodic_dim,
                          medial_surface_nan, cifti_output,
                          debug, low_mem, template_out_grid,
+                         ants_coreg=False,
                          layout=None, num_bold=1):
     """
     This workflow controls the functional preprocessing stages of FMRIPREP.
@@ -386,6 +387,7 @@ Non-gridded (surface) resamplings were performed using `mri_vol2surf`
     bold_reg_wf = init_bold_reg_wf(name='bold_reg_wf',
                                    freesurfer=freesurfer,
                                    use_bbr=use_bbr,
+                                   ants_coreg=ants_coreg,
                                    bold2t1w_dof=bold2t1w_dof,
                                    mem_gb=mem_gb['resampled'],
                                    omp_nthreads=omp_nthreads,

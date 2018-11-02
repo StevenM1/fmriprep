@@ -25,7 +25,6 @@ from ...engine import Workflow
 from ...interfaces import MultiApplyTransforms, DerivativesDataSink
 
 from ...interfaces.nilearn import Merge
-from ...interfaces.images import extract_wm
 # See https://github.com/poldracklab/fmriprep/issues/768
 from ...interfaces.freesurfer import PatchedConcatenateLTA as ConcatenateLTA
 
@@ -33,7 +32,7 @@ from ...interfaces.freesurfer import PatchedConcatenateLTA as ConcatenateLTA
 DEFAULT_MEMORY_MIN_GB = 0.01
 
 
-def init_bold_reg_wf(freesurfer, use_bbr, bold2t1w_dof, mem_gb, omp_nthreads,
+def init_bold_reg_wf(freesurfer, use_bbr, bold2t1w_dof, mem_gb, omp_nthreads, ants_coreg,
                      name='bold_reg_wf', use_compression=True,
                      use_fieldwarp=False, write_report=True):
     """
@@ -153,14 +152,26 @@ def init_bold_reg_wf(freesurfer, use_bbr, bold2t1w_dof, mem_gb, omp_nthreads,
         name='inputnode'
     )
 
-    outputnode = pe.Node(
-        niu.IdentityInterface(fields=[
-            'itk_bold_to_t1', 'itk_t1_to_bold', 'fallback',
-            'bold_t1', 'bold_mask_t1', 'bold_aseg_t1', 'bold_aparc_t1']),
-        name='outputnode'
-    )
+    if ants_coreg:
+        outputnode = pe.Node(
+            niu.IdentityInterface(fields=[
+                'itk_bold_to_t1_init', 'itk_t1_to_bold_init',
+                'itk_bold_to_t1_bbr', 'itk_t1_to_bold_bbrr',
+                'fallback',
+                'bold_t1', 'bold_mask_t1', 'bold_aseg_t1', 'bold_aparc_t1']),
+            name='outputnode'
+        )
+    else:
+        outputnode = pe.Node(
+            niu.IdentityInterface(fields=[
+                'itk_bold_to_t1', 'itk_t1_to_bold', 'fallback',
+                'bold_t1', 'bold_mask_t1', 'bold_aseg_t1', 'bold_aparc_t1']),
+            name='outputnode'
+        )
 
-    if freesurfer:
+    if ants_coreg:
+        bbr_wf = init_ants_bbr_wf(bold2t1w_dof=bold2t1w_dof)
+    elif freesurfer:
         bbr_wf = init_bbreg_wf(use_bbr=use_bbr, bold2t1w_dof=bold2t1w_dof,
                                omp_nthreads=omp_nthreads)
     else:
@@ -178,6 +189,20 @@ def init_bold_reg_wf(freesurfer, use_bbr, bold2t1w_dof, mem_gb, omp_nthreads,
                               ('outputnode.itk_t1_to_bold', 'itk_t1_to_bold'),
                               ('outputnode.fallback', 'fallback')]),
     ])
+    if ants_coreg:
+        # SM: connect *both* the initial and the refinement transformations.
+        workflow.disconnect([
+            (bbr_wf, outputnode, [('outputnode.itk_bold_to_t1', 'itk_bold_to_t1'),
+                                  ('outputnode.itk_t1_to_bold', 'itk_t1_to_bold'),
+                                  ('outputnode.fallback', 'fallback')]),
+        ])
+        workflow.connect([
+            (bbr_wf, outputnode, [('outputnode.itk_bold_to_t1_init', 'outputnode.itk_bold_to_t1_init'),
+                                  ('outputnode.itk_bold_to_t1_bbr', 'outputnode.itk_bold_to_t1_bbr'),
+                                  ('outputnode.itk_t1_to_bold_init', 'outputnode.itk_t1_to_bold_init'),
+                                  ('outputnode.itk_t1_to_bold_bbr', 'outputnode.itk_t1_to_bold_bbr'),
+                                  ])
+        ])
 
     gen_ref = pe.Node(GenerateSamplingReference(), name='gen_ref',
                       mem_gb=0.3)  # 256x256x256 * 64 / 8 ~ 150MB
@@ -215,18 +240,32 @@ def init_bold_reg_wf(freesurfer, use_bbr, bold2t1w_dof, mem_gb, omp_nthreads,
             (aparc_t1w_tfm, outputnode, [('output_image', 'bold_aparc_t1')]),
         ])
 
-    # Merge transforms placing the head motion correction last
-    nforms = 2 + int(use_fieldwarp)
-    merge_xforms = pe.Node(niu.Merge(nforms), name='merge_xforms',
-                           run_without_submitting=True, mem_gb=DEFAULT_MEMORY_MIN_GB)
-    workflow.connect([
-        (inputnode, merge_xforms, [('hmc_xforms', 'in%d' % nforms)])
-    ])
-
-    if use_fieldwarp:
+    if not ants_coreg:
+        # Merge transforms placing the head motion correction last
+        nforms = 2 + int(use_fieldwarp)
+        merge_xforms = pe.Node(niu.Merge(nforms), name='merge_xforms',
+                               run_without_submitting=True, mem_gb=DEFAULT_MEMORY_MIN_GB)
         workflow.connect([
-            (inputnode, merge_xforms, [('fieldwarp', 'in2')])
+            (inputnode, merge_xforms, [('hmc_xforms', 'in%d' % nforms)])
         ])
+
+        if use_fieldwarp:
+            workflow.connect([
+                (inputnode, merge_xforms, [('fieldwarp', 'in2')])
+            ])
+    else:
+        # Do the same, but add *both* both coregistration transforms
+        nforms = 3 + int(use_fieldwarp)
+        merge_xforms = pe.Node(niu.Merge(nforms), name='merge_xforms',
+                               run_without_submitting=True, mem_gb=DEFAULT_MEMORY_MIN_GB)
+        workflow.connect([
+            (inputnode, merge_xforms, [('hmc_xforms', 'in%d' % nforms)])
+        ])
+
+        if use_fieldwarp:
+            workflow.connect([
+                (inputnode, merge_xforms, [('fieldwarp', 'in3')])
+            ])
 
     bold_to_t1w_transform = pe.Node(
         MultiApplyTransforms(interpolation="LanczosWindowedSinc", float=True, copy_dtype=True),
@@ -234,15 +273,29 @@ def init_bold_reg_wf(freesurfer, use_bbr, bold2t1w_dof, mem_gb, omp_nthreads,
 
     merge = pe.Node(Merge(compress=use_compression), name='merge', mem_gb=mem_gb)
 
-    workflow.connect([
-        (bbr_wf, merge_xforms, [('outputnode.itk_bold_to_t1', 'in1')]),
-        (merge_xforms, bold_to_t1w_transform, [('out', 'transforms')]),
-        (inputnode, merge, [('name_source', 'header_source')]),
-        (merge, outputnode, [('out_file', 'bold_t1')]),
-        (inputnode, bold_to_t1w_transform, [('bold_split', 'input_image')]),
-        (gen_ref, bold_to_t1w_transform, [('out_file', 'reference_image')]),
-        (bold_to_t1w_transform, merge, [('out_files', 'in_files')]),
-    ])
+    #
+    if not ants_coreg:
+        workflow.connect([
+            (bbr_wf, merge_xforms, [('outputnode.itk_bold_to_t1', 'in1')]),
+            (merge_xforms, bold_to_t1w_transform, [('out', 'transforms')]),
+            (inputnode, merge, [('name_source', 'header_source')]),
+            (merge, outputnode, [('out_file', 'bold_t1')]),
+            (inputnode, bold_to_t1w_transform, [('bold_split', 'input_image')]),
+            (gen_ref, bold_to_t1w_transform, [('out_file', 'reference_image')]),
+            (bold_to_t1w_transform, merge, [('out_files', 'in_files')]),
+        ])
+    else:
+        # SM: do the same, but again, add both coregistration transforms
+        workflow.connect([
+            (bbr_wf, merge_xforms, [('outputnode.itk_bold_to_t1_bbr', 'in1'),
+                                    ('outputnode.itk_bold_to_t1_init', 'in2')]),
+            (merge_xforms, bold_to_t1w_transform, [('out', 'transforms')]),
+            (inputnode, merge, [('name_source', 'header_source')]),
+            (merge, outputnode, [('out_file', 'bold_t1')]),
+            (inputnode, bold_to_t1w_transform, [('bold_split', 'input_image')]),
+            (gen_ref, bold_to_t1w_transform, [('out_file', 'reference_image')]),
+            (bold_to_t1w_transform, merge, [('out_files', 'in_files')]),
+        ])
 
     if write_report:
         ds_report_reg = pe.Node(
@@ -619,6 +672,150 @@ for distortions remaining in the BOLD reference.
     ])
 
     return workflow
+
+
+##### SM
+def init_ants_bbr_wf(bold2t1w_dof, name='ants_bbr_wf'):
+    """ FSL's flirt sometimes fails to register functional data to anatomical data collected in a different session.
+    ANTs may work better. Unfortunately this adds another xform to include later on...
+    """
+    workflow = Workflow(name=name)
+    workflow.__desc__ = """\
+    The BOLD reference was then co-registered to the T1w reference using
+    `ants`. Co-registration was further refined using FSLs FLIRT with the boundary-based registration [@bbr]
+    cost-function.
+    Co-registration was configured with nine degrees of freedom to account
+    for distortions remaining in the BOLD reference.
+    """.format(fsl_ver=FLIRTRPT().version or '<ver>')
+
+    inputnode = pe.Node(
+        niu.IdentityInterface([
+            'in_file',
+            't1_2_fsnative_reverse_transform', 'subjects_dir', 'subject_id',  # BBRegister
+            't1_seg', 't1_brain']),  # FLIRT BBR
+        name='inputnode')
+    outputnode = pe.Node(
+        niu.IdentityInterface(['itk_bold_to_t1_init', 'itk_t1_to_bold_init', 'out_report', 'fallback',
+                               'itk_bold_to_t1_bbr', 'itk_t1_to_bold_bbr']),  # outputnode names are different than
+        # before
+        name='outputnode')
+
+    wm_mask = pe.Node(niu.Function(function=extract_wm), name='wm_mask')
+
+    ### This is the initial rigid co-registration performed by FSL. This, we override with ANTS.
+    # flt_bbr_init = pe.Node(FLIRTRPT(dof=6, generate_report=not use_bbr,
+    #                                 uses_qform=True), name='flt_bbr_init')
+    #ToDO initialize ANTs rigid coregistration node here
+    # save deformed image, and feed this deformed image to BBR
+    from ..anatomical import register_func
+    rigid_ants = pe.Node(niu.Function(input_names=['source_img', 'target_img', 'run_rigid', 'run_syn', 'run_affine'],
+                                      output_names=['transformed_source', 'mapping', 'inverse', 'out_report'],
+                                      function=register_func),
+                       name='bold_to_t1_coarse',
+                       mem_gb=10)  # really no idea here? Could be pretty intense
+    rigid_ants.inputs.run_rigid = True
+    rigid_ants.inputs.run_syn = False
+    rigid_ants.inputs.run_affine = False
+
+    invt_bbr = pe.Node(fsl.ConvertXFM(invert_xfm=True), name='invt_bbr',
+                       mem_gb=DEFAULT_MEMORY_MIN_GB)
+
+    #  BOLD to T1 transform matrix is from fsl, using c3 tools to convert to
+    #  something ANTs will like.
+    fsl2itk_fwd = pe.Node(c3.C3dAffineTool(fsl2ras=True, itk_transform=True),
+                          name='fsl2itk_fwd', mem_gb=DEFAULT_MEMORY_MIN_GB)
+    fsl2itk_inv = pe.Node(c3.C3dAffineTool(fsl2ras=True, itk_transform=True),
+                          name='fsl2itk_inv', mem_gb=DEFAULT_MEMORY_MIN_GB)
+
+    workflow.connect([
+        # first, connect rigid_ants
+        (inputnode, rigid_ants, [('in_file', 'source_img'),
+                                 ('t1_brain', 'target_img')]),
+        (rigid_ants, outputnode, [('mapping', 'itk_bold_to_t1_init'),
+                                  ('inverse', 'itk_t1_to_bold_init')])
+    ])
+
+    # workflow.connect([
+    #     (inputnode, rigid_ants, [('in_file', 'source_img'),
+    #                              ('t1_brain', 'target_img')]),
+    #     (inputnode, fsl2itk_fwd, [('t1_brain', 'reference_file'),
+    #                               ('in_file', 'source_file')]),
+    #     (inputnode, fsl2itk_inv, [('in_file', 'reference_file'),
+    #                               ('t1_brain', 'source_file')]),
+    #     (invt_bbr, fsl2itk_inv, [('out_file', 'transform_file')]),
+    #     (fsl2itk_fwd, outputnode, [('itk_transform', 'itk_bold_to_t1')]),
+    #     (fsl2itk_inv, outputnode, [('itk_transform', 'itk_t1_to_bold')]),
+    # ])
+
+    flt_bbr = pe.Node(
+        FLIRTRPT(cost_func='bbr', dof=bold2t1w_dof, generate_report=True,
+                 schedule=op.join(os.getenv('FSLDIR'), 'etc/flirtsch/bbr.sch')),
+        name='flt_bbr')
+
+    workflow.connect([
+        (inputnode, wm_mask, [('t1_seg', 'in_seg')]),
+        (rigid_ants, flt_bbr, [('transformed_source', 'in_file'),  # transformed source is used for further
+                               # refinement using BBR
+                              ('t1_brain', 'reference')]),
+        (wm_mask, flt_bbr, [('out', 'wm_seg')]),
+    ])
+
+    # Short-circuit workflow building, use boundary-based registration
+    workflow.connect([
+        # Provide the fsl2itk-nodes all .mat affine files of FSL
+        (flt_bbr, invt_bbr, [('out_matrix_file', 'in_file')]),
+        (flt_bbr, fsl2itk_fwd, [('out_matrix_file', 'transform_file')]),
+        (invt_bbr, fsl2itk_inv, [('out_file', 'transform_file')]),
+        # Add headers
+        (inputnode, fsl2itk_fwd, [('t1_brain', 'reference_file'),  # I guess c3dAffineTool needs headers to start with
+                                  ('in_file', 'source_file')]),  # I guess c3dAffineTool needs headers to start with
+        (inputnode, fsl2itk_inv, [('in_file', 'reference_file'),  # I guess c3dAffineTool needs headers to start with
+                                  ('t1_brain', 'source_file')]),  # I guess c3dAffineTool needs headers to start with
+
+        #fsl2itk tools to output node: note that this is *only* the refinement using BBR.
+        (fsl2itk_fwd, outputnode, [('itk_transform', 'itk_bold_to_t1_bbr')]),
+        (fsl2itk_inv, outputnode, [('itk_transform', 'itk_t1_to_bold_bbr')]),
+
+        # Report out
+        (flt_bbr, outputnode, [('out_report', 'out_report')]),
+    ])
+    outputnode.inputs.fallback = False
+
+    return workflow
+
+    # transforms = pe.Node(niu.Merge(2), run_without_submitting=True, name='transforms')
+    # reports = pe.Node(niu.Merge(2), run_without_submitting=True, name='reports')
+    #
+    # compare_transforms = pe.Node(niu.Function(function=compare_xforms), name='compare_transforms')
+    #
+    # select_transform = pe.Node(niu.Select(), run_without_submitting=True, name='select_transform')
+    # select_report = pe.Node(niu.Select(), run_without_submitting=True, name='select_report')
+    #
+    # fsl_to_lta = pe.MapNode(fs.utils.LTAConvert(out_lta=True), iterfield=['in_fsl'],
+    #                         name='fsl_to_lta')
+    #
+    # workflow.connect([
+    #     (flt_bbr, transforms, [('out_matrix_file', 'in1')]),
+    #     (flt_bbr_init, transforms, [('out_matrix_file', 'in2')]),
+    #     # Convert FSL transforms to LTA (RAS2RAS) transforms and compare
+    #     (inputnode, fsl_to_lta, [('in_file', 'source_file'),
+    #                              ('t1_brain', 'target_file')]),
+    #     (transforms, fsl_to_lta, [('out', 'in_fsl')]),
+    #     (fsl_to_lta, compare_transforms, [('out_lta', 'lta_list')]),
+    #     (compare_transforms, outputnode, [('out', 'fallback')]),
+    #     # Select output transform
+    #     (transforms, select_transform, [('out', 'inlist')]),
+    #     (compare_transforms, select_transform, [('out', 'index')]),
+    #     (select_transform, invt_bbr, [('out', 'in_file')]),
+    #     (select_transform, fsl2itk_fwd, [('out', 'transform_file')]),
+    #     (flt_bbr, reports, [('out_report', 'in1')]),
+    #     (flt_bbr_init, reports, [('out_report', 'in2')]),
+    #     (reports, select_report, [('out', 'inlist')]),
+    #     (compare_transforms, select_report, [('out', 'index')]),
+    #     (select_report, outputnode, [('out', 'out_report')]),
+    # ])
+    #
+    # return workflow
 
 
 def compare_xforms(lta_list, norm_threshold=15):
