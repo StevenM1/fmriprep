@@ -745,8 +745,8 @@ def init_ants_bbr_wf(bold2t1w_dof, name='ants_bbr_wf'):
     workflow.connect([
         (inputnode, wm_mask, [('t1_seg', 'in_seg')]),
         # We use the *output* of ANTs as *input* to fsl BBR, for further refinement
-        (rigid_ants, flt_bbr, [('transformed_source', 'in_file'),
-                              ('t1_brain', 'reference')]),
+        (rigid_ants, flt_bbr, [('transformed_source', 'in_file')]),
+        (inputnode, flt_bbr, [('t1_brain', 'reference')]),  # reference img is still t1_brain
         (wm_mask, flt_bbr, [('out', 'wm_seg')]),
     ])
 
@@ -756,6 +756,7 @@ def init_ants_bbr_wf(bold2t1w_dof, name='ants_bbr_wf'):
         (flt_bbr, invt_bbr, [('out_matrix_file', 'in_file')]),
         (flt_bbr, fsl2itk_fwd, [('out_matrix_file', 'transform_file')]),
         (invt_bbr, fsl2itk_inv, [('out_file', 'transform_file')]),
+
         # Forward transform in fsl2itk: source = rigid_ants output; reference = inputnode t1_brain
         (inputnode, fsl2itk_fwd, [('t1_brain', 'reference_file')]),
         (rigid_ants, fsl2itk_fwd, [('transformed_source', 'source_file')]),
