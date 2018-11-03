@@ -370,7 +370,7 @@ def init_single_subject_wf(subject_id, session_id, task_id, name, reportlets_dir
             'bold': ['/completely/made/up/path/sub-01_task-nback_bold.nii.gz']
         }
         layout = None
-    else
+    else:
         subject_data, layout = collect_data(bids_dir, subject_id, session_id, task_id)
 
     # Make sure we always go through these two checks
