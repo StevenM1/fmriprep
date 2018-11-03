@@ -162,6 +162,11 @@ def get_parser():
         '--medial-surface-nan', required=False, action='store_true', default=False,
         help='Replace medial wall values with NaNs on functional GIFTI files. Only '
         'performed for GIFTI files mapped to a freesurfer subject (fsaverage or fsnative).')
+    ### SM Added the following option
+    g_conf.add_argument(
+        '--ants-coreg', required=False, action='store_true', default=False,
+        help='Use ANTs rigid registration as a first step in coregistration, before using FSL FLIRT with BBR'
+    )
 
     # ICA_AROMA options
     g_aroma = parser.add_argument_group('Specific options for running ICA_AROMA')
@@ -552,6 +557,7 @@ def build_workflow(opts, retval):
         use_aroma=opts.use_aroma,
         aroma_melodic_dim=opts.aroma_melodic_dimensionality,
         ignore_aroma_err=opts.ignore_aroma_denoising_errors,
+        ants_coreg=ops.ants_coreg
     )
     retval['return_code'] = 0
 

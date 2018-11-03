@@ -38,7 +38,8 @@ def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids
                      omp_nthreads, skull_strip_template, skull_strip_fixed_seed,
                      freesurfer, output_spaces, template, medial_surface_nan, cifti_output, hires,
                      use_bbr, bold2t1w_dof, fmap_bspline, fmap_demean, use_syn, force_syn,
-                     use_aroma, ignore_aroma_err, aroma_melodic_dim, template_out_grid):
+                     use_aroma, ignore_aroma_err, aroma_melodic_dim, template_out_grid,
+                     ants_coreg):
     """
     This workflow organizes the execution of FMRIPREP, with a sub-workflow for
     each subject.
@@ -207,7 +208,8 @@ def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids
                                                    template_out_grid=template_out_grid,
                                                    use_aroma=use_aroma,
                                                    aroma_melodic_dim=aroma_melodic_dim,
-                                                   ignore_aroma_err=ignore_aroma_err)
+                                                   ignore_aroma_err=ignore_aroma_err,
+                                                   ants_coreg=ants_coreg)
 
         single_subject_wf.config['execution']['crashdump_dir'] = (
             os.path.join(output_dir, "fmriprep", "sub-" + subject_id, 'log', run_uuid)
@@ -229,7 +231,7 @@ def init_single_subject_wf(subject_id, task_id, name, reportlets_dir, output_dir
                            freesurfer, output_spaces, template, medial_surface_nan,
                            cifti_output, hires, use_bbr, bold2t1w_dof, fmap_bspline, fmap_demean,
                            use_syn, force_syn, template_out_grid,
-                           use_aroma, aroma_melodic_dim, ignore_aroma_err):
+                           use_aroma, aroma_melodic_dim, ignore_aroma_err, ants_coreg):
     """
     This workflow organizes the preprocessing pipeline for a single subject.
     It collects and reports information about the subject, and prepares
@@ -494,7 +496,8 @@ to workflows in *fMRIPrep*'s documentation]\
                                                use_aroma=use_aroma,
                                                aroma_melodic_dim=aroma_melodic_dim,
                                                ignore_aroma_err=ignore_aroma_err,
-                                               num_bold=len(subject_data['bold']))
+                                               num_bold=len(subject_data['bold']),
+                                               ants_coreg=ants_coreg)
 
         workflow.connect([
             (anat_preproc_wf, func_preproc_wf,
