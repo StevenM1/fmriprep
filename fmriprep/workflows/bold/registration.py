@@ -732,8 +732,10 @@ def init_ants_bbr_wf(bold2t1w_dof, name='ants_bbr_wf'):
         # Combine transformations in merge
         (inputnode, rigid_ants, [('in_file', 'source_img'),
                                  ('t1_brain', 'target_img')]),
-        (rigid_ants, merge_xforms_bold_to_t1, [('mapping', 'in1')]),  # from bold to t1: apply antsreg *first*
-        (rigid_ants, merge_xforms_t1_to_bold, [('inverse', 'in2')])   # from t1 to bold: apply antsreg *second*
+        (rigid_ants, merge_xforms_bold_to_t1, [('mapping', 'in2')]),
+        # from bold to t1: apply antsreg *first*, so *last* in list (ants applies transformations in reverse order)
+        (rigid_ants, merge_xforms_t1_to_bold, [('inverse', 'in1')])
+        # from t1 to bold: apply antsreg *second*, so *first* in list
     ])
 
     # Initialize bbr routine
@@ -765,9 +767,9 @@ def init_ants_bbr_wf(bold2t1w_dof, name='ants_bbr_wf'):
         (rigid_ants, fsl2itk_inv, [('transformed_source', 'reference_file')]),
 
         # add forward transform in ITK to merge node...
-        (fsl2itk_fwd, merge_xforms_bold_to_t1, [('itk_transform', 'in2')]),
+        (fsl2itk_fwd, merge_xforms_bold_to_t1, [('itk_transform', 'in1')]),
         # ...and inverse transform to other merge node
-        (fsl2itk_inv, merge_xforms_t1_to_bold, [('itk_transform', 'in1')]),
+        (fsl2itk_inv, merge_xforms_t1_to_bold, [('itk_transform', 'in2')]),
 
         # Connect to outputnode
         (merge_xforms_t1_to_bold, outputnode, [('out', 'itk_t1_to_bold')]),
