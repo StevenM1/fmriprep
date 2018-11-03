@@ -768,6 +768,10 @@ def init_ants_bbr_wf(bold2t1w_dof, name='ants_bbr_wf'):
         # ...and inverse transform to other merge node
         (fsl2itk_inv, merge_xforms_t1_to_bold, [('itk_transform', 'in1')]),
 
+        # Connect to outputnode
+        (merge_xforms_t1_to_bold, outputnode, [('out', 'itk_t1_to_bold')]),
+        (merge_xforms_bold_to_t1, outputnode, [('out', 'itk_bold_to_t1')]),
+
         # Report out
         (flt_bbr, outputnode, [('out_report', 'out_report')]),
     ])
