@@ -25,6 +25,7 @@ from ...engine import Workflow
 from ...interfaces import MultiApplyTransforms, DerivativesDataSink
 
 from ...interfaces.nilearn import Merge
+from ...interfaces.images import extract_wm
 # See https://github.com/poldracklab/fmriprep/issues/768
 from ...interfaces.freesurfer import PatchedConcatenateLTA as ConcatenateLTA
 from ..anatomical import register_func
