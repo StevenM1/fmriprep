@@ -557,7 +557,7 @@ def build_workflow(opts, retval):
         use_aroma=opts.use_aroma,
         aroma_melodic_dim=opts.aroma_melodic_dimensionality,
         ignore_aroma_err=opts.ignore_aroma_denoising_errors,
-        ants_coreg=ops.ants_coreg
+        ants_coreg=opts.ants_coreg
     )
     retval['return_code'] = 0
 
