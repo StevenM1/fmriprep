@@ -69,6 +69,9 @@ def get_parser():
     g_bids.add_argument('--participant_label', '--participant-label', action='store', nargs='+',
                         help='a space delimited list of participant identifiers or a single '
                              'identifier (the sub- prefix can be removed)')
+    g_bids.add_argument('--session_id', '--session-id', action='store', nargs='+',
+                        help='Specify which to select from which bold session data should be processed')
+
     # Re-enable when option is actually implemented
     # g_bids.add_argument('-s', '--session-id', action='store', default='single_session',
     #                     help='select a specific session to be processed')
@@ -527,6 +530,7 @@ def build_workflow(opts, retval):
 
     retval['workflow'] = init_fmriprep_wf(
         subject_list=subject_list,
+        session_id=opts.session_id,
         task_id=opts.task_id,
         run_uuid=run_uuid,
         ignore=opts.ignore,

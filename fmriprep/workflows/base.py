@@ -33,7 +33,7 @@ from .anatomical import init_anat_preproc_wf
 from .bold import init_func_preproc_wf
 
 
-def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids_dir,
+def init_fmriprep_wf(subject_list, session_id, task_id, run_uuid, work_dir, output_dir, bids_dir,
                      ignore, debug, low_mem, anat_only, longitudinal, t2s_coreg,
                      omp_nthreads, skull_strip_template, skull_strip_fixed_seed,
                      freesurfer, output_spaces, template, medial_surface_nan, cifti_output, hires,
@@ -179,6 +179,7 @@ def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids
     reportlets_dir = os.path.join(work_dir, 'reportlets')
     for subject_id in subject_list:
         single_subject_wf = init_single_subject_wf(subject_id=subject_id,
+                                                   session_id=session_id,
                                                    task_id=task_id,
                                                    name="single_subject_" + subject_id + "_wf",
                                                    reportlets_dir=reportlets_dir,
@@ -225,7 +226,7 @@ def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids
     return fmriprep_wf
 
 
-def init_single_subject_wf(subject_id, task_id, name, reportlets_dir, output_dir, bids_dir,
+def init_single_subject_wf(subject_id, session_id, task_id, name, reportlets_dir, output_dir, bids_dir,
                            ignore, debug, low_mem, anat_only, longitudinal, t2s_coreg,
                            omp_nthreads, skull_strip_template, skull_strip_fixed_seed,
                            freesurfer, output_spaces, template, medial_surface_nan,
@@ -369,8 +370,8 @@ def init_single_subject_wf(subject_id, task_id, name, reportlets_dir, output_dir
             'bold': ['/completely/made/up/path/sub-01_task-nback_bold.nii.gz']
         }
         layout = None
-    else:
-        subject_data, layout = collect_data(bids_dir, subject_id, task_id)
+    else
+        subject_data, layout = collect_data(bids_dir, subject_id, session_id, task_id)
 
     # Make sure we always go through these two checks
     if not anat_only and subject_data['bold'] == []:

@@ -118,7 +118,7 @@ def collect_participants(bids_dir, participant_label=None, strict=False):
     return found_label
 
 
-def collect_data(dataset, participant_label, task=None):
+def collect_data(dataset, participant_label, session=None, task=None):
     """
     SM: custom adjustments to allow for grabbing MP2RAGE image, as well as a T1map. These are not
     part of the BIDS specification at the moment of writing.
@@ -156,11 +156,17 @@ def collect_data(dataset, participant_label, task=None):
 
     """
     layout = BIDSLayout(dataset, exclude=['derivatives', 'sourcedata'])
+    ### SM: add ability to select only one session of BOLD-files
+    if session is not None:
+        bold_query = {'subject': participant_label, 'session': session,
+                      'modality': 'func', 'type': 'bold', 'extensions': ['nii', 'nii.gz']}
+    else:
+        bold_query = {'subject': participant_label,
+                      'modality': 'func', 'type': 'bold', 'extensions': ['nii', 'nii.gz']}
     queries = {
         'fmap': {'subject': participant_label, 'modality': 'fmap',
                  'extensions': ['nii', 'nii.gz']},
-        'bold': {'subject': participant_label, 'modality': 'func', 'type': 'bold',
-                 'extensions': ['nii', 'nii.gz']},
+        'bold': bold_query,
         'sbref': {'subject': participant_label, 'modality': 'func', 'type': 'sbref',
                   'extensions': ['nii', 'nii.gz']},
         'flair': {'subject': participant_label, 'modality': 'anat', 'type': 'FLAIR',
