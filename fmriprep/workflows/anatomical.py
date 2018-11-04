@@ -1487,10 +1487,22 @@ def register_func(source_img, target_img, run_rigid=True, run_syn=True, run_affi
     import nibabel as nib
 
     file_name = os.path.basename(source_img)
+    if '_echo_' in source_img:
+        # generate random string to append to filename, so that multiple echos calling this *exact same function*
+        # with *exact same input* do not conflict
+        import string
+        import random
+
+        def id_generator(size=50, chars=string.ascii_uppercase + string.ascii_lowercase + string.digits):
+            return ''.join(random.choice(chars) for _ in range(size))
+
+        file_name = file_name + id_generator()
+
     syn_results = nighres.registration.embedded_antsreg(
         source_image=source_img,
         target_image=target_img,
         run_rigid=run_rigid, run_syn=run_syn, run_affine=run_affine,
+        file_name=file_name,
         cost_function='MutualInformation',
         interpolation='NearestNeighbor',
         save_data=False, overwrite=False)
