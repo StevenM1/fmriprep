@@ -1496,7 +1496,8 @@ def register_func(source_img, target_img, run_rigid=True, run_syn=True, run_affi
         def id_generator(size=50, chars=string.ascii_uppercase + string.ascii_lowercase + string.digits):
             return ''.join(random.choice(chars) for _ in range(size))
 
-        file_name = file_name + id_generator()
+        file_name = file_name.replace('.nii', '_' + id_generator() + '.nii')
+    print(file_name)
 
     syn_results = nighres.registration.embedded_antsreg(
         source_image=source_img,
