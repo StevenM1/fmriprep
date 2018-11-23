@@ -703,7 +703,8 @@ def init_ants_bbr_wf(bold2t1w_dof, name='ants_bbr_wf'):
 
     # Rigid registration in ANTs, as embedded in nighres
     rigid_ants = pe.Node(niu.Function(input_names=['source_img', 'target_img', 'run_rigid', 'run_syn', 'run_affine'],
-                                      output_names=['transformed_source', 'mapping', 'inverse', 'out_report'],
+                                      output_names=['transformed_source', 'mapping', 'inverse', 'mapping_cmap',
+                                                    'inverse_cmap', 'out_report'],
                                       function=register_func),
                        name='bold_to_t1_coarse',
                        mem_gb=5)  # really no idea here?
