@@ -2171,7 +2171,7 @@ def register_func(source_img, target_img, run_rigid=True, run_syn=True, run_affi
                           compress=compress_report),
         out_file=_out_report
     )
-    print(inv)
+    print(inverse)
     print(trans_source)
     print(mapping)
     return trans_source, mapping, inverse, mapping_cmap, inverse_cmap, _out_report
