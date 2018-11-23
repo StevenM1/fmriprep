@@ -1443,6 +1443,8 @@ def init_anat_derivatives_wf(output_dir, output_spaces, template, freesurfer,
             (inputnode, ds_mni_tpms, [('mni_tpms', 'in_file')]),
             (t1_name, ds_t1_mni_warp, [('out', 'source_file')]),
             (t1_name, ds_t1_mni_inv_warp, [('out', 'source_file')]),
+            (t1_name, ds_t1_mni_warp_cm, [('out', 'source_file')]),  ### Added cmap
+            (t1_name, ds_t1_mni_inv_warp_cm, [('out', 'source_file')]),  ### Added cmap
             (t1_name, ds_t1_mni, [('out', 'source_file')]),
             (t1_name, ds_mni_mask, [('out', 'source_file')]),
             (t1_name, ds_mni_seg, [('out', 'source_file')]),
