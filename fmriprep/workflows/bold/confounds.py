@@ -163,6 +163,20 @@ placed within the corresponding confounds file.
     tcc_tfm = pe.Node(ApplyTransforms(interpolation='NearestNeighbor', float=True),
                       name='tcc_tfm', mem_gb=0.1)
 
+    ###### SM: ants_coreg gives *two* transforms, only *one* needs to be inverted
+    def _get_invert_transform_flags(xform):
+        if isinstance(xform, list):
+            if len(xform) == 2:
+                print(xform)
+                print('Setting invert transform flags to [True, True]')
+                # the order here should be [ants_coreg.mat, affine.txt].
+                # note that you would expect only ants_coreg.mat to be inverted,
+                # but some plotting showed *both* require inversion. I don't know why, but
+                # the output fits only if both are inverted.
+                return [True, True]
+        else:
+            return [False]
+
     # Ensure ROIs don't go off-limits (reduced FoV)
     csf_msk = pe.Node(niu.Function(function=_maskroi), name='csf_msk')
     wm_msk = pe.Node(niu.Function(function=_maskroi), name='wm_msk')
@@ -229,16 +243,20 @@ placed within the corresponding confounds file.
         (acc_tpm, acc_roi, [('out_file', 'in_tpm')]),
         # Map ROIs to BOLD
         (inputnode, csf_tfm, [('bold_mask', 'reference_image'),
-                              ('t1_bold_xform', 'transforms')]),
+                              ('t1_bold_xform', 'transforms'),
+                              (('t1_bold_xform', _get_invert_transform_flags), 'invert_transform_flags')]),  ### SM
         (csf_roi, csf_tfm, [('roi_file', 'input_image')]),
         (inputnode, wm_tfm, [('bold_mask', 'reference_image'),
-                             ('t1_bold_xform', 'transforms')]),
+                             ('t1_bold_xform', 'transforms'),
+                             (('t1_bold_xform', _get_invert_transform_flags), 'invert_transform_flags')]),  ### SM
         (wm_roi, wm_tfm, [('roi_file', 'input_image')]),
         (inputnode, acc_tfm, [('bold_mask', 'reference_image'),
-                              ('t1_bold_xform', 'transforms')]),
+                              ('t1_bold_xform', 'transforms'),
+                              (('t1_bold_xform', _get_invert_transform_flags), 'invert_transform_flags')]),  ### SM
         (acc_roi, acc_tfm, [('roi_file', 'input_image')]),
         (inputnode, tcc_tfm, [('bold_mask', 'reference_image'),
-                              ('t1_bold_xform', 'transforms')]),
+                              ('t1_bold_xform', 'transforms'),
+                              (('t1_bold_xform', _get_invert_transform_flags), 'invert_transform_flags')]),  ### SM
         (csf_roi, tcc_tfm, [('eroded_mask', 'input_image')]),
         # Mask ROIs with bold_mask
         (inputnode, csf_msk, [('bold_mask', 'in_mask')]),
