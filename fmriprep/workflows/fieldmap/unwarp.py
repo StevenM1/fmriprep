@@ -274,13 +274,28 @@ def init_fmap_unwarp_report_wf(name='fmap_unwarp_report_wf', suffix='variant-hmc
         mem_gb=DEFAULT_MEMORY_MIN_GB, run_without_submitting=True
     )
 
+    ###### SM: ants_coreg gives *two* transforms, only *one* needs to be inverted
+    def _get_invert_transform_flags(xform):
+        if isinstance(xform, list):
+            if len(xform) == 2:
+                print(xform)
+                print('Setting invert transform flags to [True, True]')
+                # the order here should be [ants_coreg.mat, affine.txt].
+                # note that you would expect only ants_coreg.mat to be inverted,
+                # but some plotting showed *both* require inversion. I don't know why, but
+                # the output fits only if both are inverted.
+                return [True, True]
+        else:
+            return [False]
+
     workflow.connect([
         (inputnode, bold_rpt, [('in_post', 'after'),
                                ('in_pre', 'before')]),
         (bold_rpt, ds_report_sdc, [('out_report', 'in_file')]),
         (inputnode, map_seg, [('in_post', 'reference_image'),
                               ('in_seg', 'input_image'),
-                              ('in_xfm', 'transforms')]),
+                              ('in_xfm', 'transforms'),
+                              (('in_xfm', _get_invert_transform_flags), 'invert_transform_flags')]),  ### SM,
         (map_seg, sel_wm, [('output_image', 'in_seg')]),
         (sel_wm, bold_rpt, [('out', 'wm_seg')]),
     ])
