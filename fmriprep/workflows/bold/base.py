@@ -657,6 +657,18 @@ Non-gridded (surface) resamplings were performed using `mri_vol2surf`
                 ('outputnode.stc_file', 'bold_file')]),
         ])
 
+        # from "if not multiecho" above
+        workflow.connect([
+            (inputnode, func_derivatives_wf, [
+                ('bold_file', 'inputnode.source_file')]),
+            (bold_bold_trans_wf, bold_confounds_wf, [
+                ('outputnode.bold', 'inputnode.bold'),
+                ('outputnode.bold_mask', 'inputnode.bold_mask')]),
+            (bold_split, bold_t1_trans_wf, [
+                ('out_files', 'inputnode.bold_split')]),
+        ])
+
+
         # Turn *OFF* multi-echo now - the pipeline should treat all echos as single echos further down the line!
         multiecho = False
         ### END ADJUSTED
