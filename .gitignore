@@ -66,6 +66,16 @@ target/
 #Ipython Notebook
 .ipynb_checkpoints
 
+# pycharm project settings
+.idea
+
+# vscode project settings
+.vscode
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
 auth/
 secrets.py
 local_settings.py

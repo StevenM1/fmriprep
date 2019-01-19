@@ -20,20 +20,21 @@ from nipype.pipeline import engine as pe
 from nipype.interfaces import utility as niu
 from nilearn import __version__ as nilearn_ver
 
-from ..engine import Workflow
-from ..interfaces import (
-    BIDSDataGrabber, BIDSFreeSurferDir, BIDSInfo, SubjectSummary, AboutSummary,
-    DerivativesDataSink
+from niworkflows.engine.workflows import LiterateWorkflow as Workflow
+from niworkflows.interfaces.bids import (
+    BIDSInfo, BIDSDataGrabber, BIDSFreeSurferDir
 )
-from ..utils.bids import collect_data
-from ..utils.misc import fix_multi_T1w_source_name
+from niworkflows.utils.bids import collect_data
+from niworkflows.utils.misc import fix_multi_T1w_source_name
+
+from ..interfaces import SubjectSummary, AboutSummary, DerivativesDataSink
 from ..__about__ import __version__
 
 from .anatomical import init_anat_preproc_wf
 from .bold import init_func_preproc_wf
 
 
-def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids_dir,
+def init_fmriprep_wf(subject_list, task_id, echo_idx, run_uuid, work_dir, output_dir, bids_dir,
                      ignore, debug, low_mem, anat_only, longitudinal, t2s_coreg,
                      omp_nthreads, skull_strip_template, skull_strip_fixed_seed,
                      freesurfer, output_spaces, template, medial_surface_nan, cifti_output, hires,
@@ -55,6 +56,7 @@ def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids
         from fmriprep.workflows.base import init_fmriprep_wf
         wf = init_fmriprep_wf(subject_list=['fmripreptest'],
                               task_id='',
+                              echo_idx=None,
                               run_uuid='X',
                               work_dir='.',
                               output_dir='.',
@@ -83,7 +85,7 @@ def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids
                               force_syn=True,
                               use_aroma=False,
                               ignore_aroma_err=False,
-                              aroma_melodic_dim=None,
+                              aroma_melodic_dim=-200,
                               template_out_grid='native')
 
 
@@ -93,6 +95,9 @@ def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids
             List of subject labels
         task_id : str or None
             Task ID of BOLD series to preprocess, or ``None`` to preprocess all
+        echo_idx : int or None
+            Index of echo to preprocess in multiecho BOLD series,
+            or ``None`` to preprocess all
         run_uuid : str
             Unique identifier for execution instance
         work_dir : str
@@ -113,7 +118,7 @@ def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids
             Treat multiple sessions as longitudinal (may increase runtime)
             See sub-workflows for specific differences
         t2s_coreg : bool
-            Use multiple BOLD echos to create T2*-map for T2*-driven coregistration
+            For multi-echo EPI, use the calculated T2*-map for T2*-driven coregistration
         omp_nthreads : int
             Maximum number of threads an individual process may use
         skull_strip_template : str
@@ -173,41 +178,44 @@ def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids
                 derivatives=output_dir,
                 freesurfer_home=os.getenv('FREESURFER_HOME'),
                 spaces=output_spaces),
-            name='fsdir', run_without_submitting=True)
+            name='fsdir_run_' + run_uuid.replace('-', '_'), run_without_submitting=True)
 
     reportlets_dir = os.path.join(work_dir, 'reportlets')
     for subject_id in subject_list:
-        single_subject_wf = init_single_subject_wf(subject_id=subject_id,
-                                                   task_id=task_id,
-                                                   name="single_subject_" + subject_id + "_wf",
-                                                   reportlets_dir=reportlets_dir,
-                                                   output_dir=output_dir,
-                                                   bids_dir=bids_dir,
-                                                   ignore=ignore,
-                                                   debug=debug,
-                                                   low_mem=low_mem,
-                                                   anat_only=anat_only,
-                                                   longitudinal=longitudinal,
-                                                   t2s_coreg=t2s_coreg,
-                                                   omp_nthreads=omp_nthreads,
-                                                   skull_strip_template=skull_strip_template,
-                                                   skull_strip_fixed_seed=skull_strip_fixed_seed,
-                                                   freesurfer=freesurfer,
-                                                   output_spaces=output_spaces,
-                                                   template=template,
-                                                   medial_surface_nan=medial_surface_nan,
-                                                   cifti_output=cifti_output,
-                                                   hires=hires,
-                                                   use_bbr=use_bbr,
-                                                   bold2t1w_dof=bold2t1w_dof,
-                                                   fmap_bspline=fmap_bspline,
-                                                   fmap_demean=fmap_demean,
-                                                   use_syn=use_syn,
-                                                   force_syn=force_syn,
-                                                   template_out_grid=template_out_grid,
-                                                   use_aroma=use_aroma,
-                                                   aroma_melodic_dim=aroma_melodic_dim,
-                                                   ignore_aroma_err=ignore_aroma_err)
+        single_subject_wf = init_single_subject_wf(
+            subject_id=subject_id,
+            task_id=task_id,
+            echo_idx=echo_idx,
+            name="single_subject_" + subject_id + "_wf",
+            reportlets_dir=reportlets_dir,
+            output_dir=output_dir,
+            bids_dir=bids_dir,
+            ignore=ignore,
+            debug=debug,
+            low_mem=low_mem,
+            anat_only=anat_only,
+            longitudinal=longitudinal,
+            t2s_coreg=t2s_coreg,
+            omp_nthreads=omp_nthreads,
+            skull_strip_template=skull_strip_template,
+            skull_strip_fixed_seed=skull_strip_fixed_seed,
+            freesurfer=freesurfer,
+            output_spaces=output_spaces,
+            template=template,
+            medial_surface_nan=medial_surface_nan,
+            cifti_output=cifti_output,
+            hires=hires,
+            use_bbr=use_bbr,
+            bold2t1w_dof=bold2t1w_dof,
+            fmap_bspline=fmap_bspline,
+            fmap_demean=fmap_demean,
+            use_syn=use_syn,
+            force_syn=force_syn,
+            template_out_grid=template_out_grid,
+            use_aroma=use_aroma,
+            aroma_melodic_dim=aroma_melodic_dim,
+            ignore_aroma_err=ignore_aroma_err,
+        )
 
         single_subject_wf.config['execution']['crashdump_dir'] = (
             os.path.join(output_dir, "fmriprep", "sub-" + subject_id, 'log', run_uuid)
@@ -223,8 +231,8 @@ def init_fmriprep_wf(subject_list, task_id, run_uuid, work_dir, output_dir, bids
     return fmriprep_wf
 
 
-def init_single_subject_wf(subject_id, task_id, name, reportlets_dir, output_dir, bids_dir,
-                           ignore, debug, low_mem, anat_only, longitudinal, t2s_coreg,
+def init_single_subject_wf(subject_id, task_id, echo_idx, name, reportlets_dir, output_dir,
+                           bids_dir, ignore, debug, low_mem, anat_only, longitudinal, t2s_coreg,
                            omp_nthreads, skull_strip_template, skull_strip_fixed_seed,
                            freesurfer, output_spaces, template, medial_surface_nan,
                            cifti_output, hires, use_bbr, bold2t1w_dof, fmap_bspline, fmap_demean,
@@ -247,6 +255,7 @@ def init_single_subject_wf(subject_id, task_id, name, reportlets_dir, output_dir
         from fmriprep.workflows.base import init_single_subject_wf
         wf = init_single_subject_wf(subject_id='test',
                                     task_id='',
+                                    echo_idx=None,
                                     name='single_subject_wf',
                                     reportlets_dir='.',
                                     output_dir='.',
@@ -275,7 +284,7 @@ def init_single_subject_wf(subject_id, task_id, name, reportlets_dir, output_dir
                                     force_syn=True,
                                     template_out_grid='native',
                                     use_aroma=False,
-                                    aroma_melodic_dim=None,
+                                    aroma_melodic_dim=-200,
                                     ignore_aroma_err=False)
 
     Parameters
@@ -284,6 +293,9 @@ def init_single_subject_wf(subject_id, task_id, name, reportlets_dir, output_dir
             List of subject labels
         task_id : str or None
             Task ID of BOLD series to preprocess, or ``None`` to preprocess all
+        echo_idx : int or None
+            Index of echo to preprocess in multiecho BOLD series,
+            or ``None`` to preprocess all
         name : str
             Name of workflow
         ignore : list
@@ -298,7 +310,7 @@ def init_single_subject_wf(subject_id, task_id, name, reportlets_dir, output_dir
             Treat multiple sessions as longitudinal (may increase runtime)
             See sub-workflows for specific differences
         t2s_coreg : bool
-            Use multiple BOLDS echos to create T2*-map for T2*-driven coregistration
+            For multi-echo EPI, use the calculated T2*-map for T2*-driven coregistration
         omp_nthreads : int
             Maximum number of threads an individual process may use
         skull_strip_template : str
@@ -368,7 +380,7 @@ def init_single_subject_wf(subject_id, task_id, name, reportlets_dir, output_dir
         }
         layout = None
     else:
-        subject_data, layout = collect_data(bids_dir, subject_id, task_id)
+        subject_data, layout = collect_data(bids_dir, subject_id, task_id, echo_idx)
 
     # Make sure we always go through these two checks
     if not anat_only and subject_data['bold'] == []:

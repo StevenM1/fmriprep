@@ -149,11 +149,11 @@ we recommend to include in your paper.
    <p>
      1. Esteban O, Markiewicz CJ, Blair RW, Moodie CA, Isik AI, Erramuzpe A, Kent JD, Goncalves M,
         DuPre E, Snyder M, Oya H, Ghosh SS, Wright J, Durnez J, Poldrack RA, Gorgolewski KJ.
-        FMRIPrep: a robust preprocessing pipeline for functional MRI.
-        bioRxiv. 2018. 306951; doi:<a href="https://doi.org/10.1101/306951">10.1101/306951</a>
+        fMRIPrep: a robust preprocessing pipeline for functional MRI.
+        Nat Meth. 2018; doi:<a href="https://doi.org/10.1038/s41592-018-0235-4">10.1038/s41592-018-0235-4</a>
    </p>
    <p>
-     2. <span id="fmriprep_citation">FMRIPREP</span> Available from: <a id="fmriprep_doi_url" href="https://doi.org/10.5281/zenodo.852659">10.5281/zenodo.852659</a>.
+     2. <span id="fmriprep_citation">fMRIPrep</span> Available from: <a id="fmriprep_doi_url" href="https://doi.org/10.5281/zenodo.852659">10.5281/zenodo.852659</a>.
      <img src onerror='fillCitation()' alt="" />
    </p>
    <p>
@@ -257,7 +257,7 @@ Other relevant references
   .. [Power2017] Power JD, Plitt M, Kundu P, Bandettini PA, Martin A (2017) Temporal interpolation alters
       motion in fMRI scans: Magnitudes and consequences for artifact detection. PLOS ONE 12(9): e0182939.
       doi:`10.1371/journal.pone.0182939 <https://doi.org/10.1371/journal.pone.0182939>`_.
-      
-  .. [Brett2001] Brett M, Leff AP, Rorden C, Ashburner J (2001) Spatial Normalization of Brain Images with 
-      Focal Lesions Using Cost Function Masking. NeuroImage 14(2) 
+
+  .. [Brett2001] Brett M, Leff AP, Rorden C, Ashburner J (2001) Spatial Normalization of Brain Images with
+      Focal Lesions Using Cost Function Masking. NeuroImage 14(2)
       doi:`10.006/nimg.2001.0845 <https://doi.org/10.1006/nimg.2001.0845>`_.

@@ -7,7 +7,6 @@
 
 def main():
     """ Install entry-point """
-    from io import open
     from os import path as op
     from inspect import getfile, currentframe
     from setuptools import setup, find_packages
@@ -39,6 +38,7 @@ def main():
             'data/*.mat',
             'data/boilerplate.bib',
             'data/itkIdentityTransform.txt',
+            'data/flirtsch/bbr.sch',
             'viz/*.tpl',
             'viz/*.json',
         ]
@@ -49,7 +49,7 @@ def main():
     version = None
     cmdclass = {}
     if op.isfile(op.join(root_dir, 'fmriprep', 'VERSION')):
-        with open(op.join(root_dir, 'fmriprep', 'VERSION')) as vfile:
+        with open(op.join(root_dir, 'fmriprep', 'VERSION'), 'rt') as vfile:
             version = vfile.readline().strip()
         pkg_data['fmriprep'].insert(0, 'VERSION')
 

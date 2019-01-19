@@ -15,8 +15,7 @@ def sink_mask_file(in_file, orig_file, out_dir):
 
 
 def init_main_wf(bold_file, out_dir, base_dir=None, name='main_wf'):
-    wf = init_bold_reference_wf(enhance_t2=True,
-                                omp_nthreads=4,
+    wf = init_bold_reference_wf(omp_nthreads=4,
                                 name=name)
     wf.base_dir = base_dir
     wf.inputs.inputnode.bold_file = bold_file
@@ -27,7 +26,7 @@ def init_main_wf(bold_file, out_dir, base_dir=None, name='main_wf'):
     sink.inputs.orig_file = bold_file
     wf.connect([
         (wf.get_node('outputnode'), sink, [('bold_mask', 'in_file')]),
-        ])
+    ])
     return wf
 
 

@@ -10,6 +10,7 @@ Handling confounds
 
 """
 import os
+import re
 import shutil
 import numpy as np
 import pandas as pd
@@ -27,6 +28,7 @@ LOGGER = logging.getLogger('nipype.interface')
 class GatherConfoundsInputSpec(BaseInterfaceInputSpec):
     signals = File(exists=True, desc='input signals')
     dvars = File(exists=True, desc='file containing DVARS')
+    std_dvars = File(exists=True, desc='file containing standardized DVARS')
     fd = File(exists=True, desc='input framewise displacement')
     tcompcor = File(exists=True, desc='input tCompCorr')
     acompcor = File(exists=True, desc='input aCompCorr')
@@ -79,6 +81,7 @@ class GatherConfounds(SimpleInterface):
         combined_out, confounds_list = _gather_confounds(
             signals=self.inputs.signals,
             dvars=self.inputs.dvars,
+            std_dvars=self.inputs.std_dvars,
             fdisp=self.inputs.fd,
             tcompcor=self.inputs.tcompcor,
             acompcor=self.inputs.acompcor,
@@ -94,6 +97,7 @@ class GatherConfounds(SimpleInterface):
 
 class ICAConfoundsInputSpec(BaseInterfaceInputSpec):
     in_directory = Directory(mandatory=True, desc='directory where ICA derivatives are found')
+    skip_vols = traits.Int(desc='number of non steady state volumes identified')
     ignore_aroma_err = traits.Bool(False, usedefault=True, desc='ignore ICA-AROMA errors')
 
 
@@ -111,7 +115,7 @@ class ICAConfounds(SimpleInterface):
 
     def _run_interface(self, runtime):
         aroma_confounds, motion_ics_out, melodic_mix_out = _get_ica_confounds(
-            self.inputs.in_directory, newpath=runtime.cwd)
+            self.inputs.in_directory, self.inputs.skip_vols, newpath=runtime.cwd)
 
         if aroma_confounds is not None:
             self._results['aroma_confounds'] = aroma_confounds
@@ -123,7 +127,7 @@ class ICAConfounds(SimpleInterface):
         return runtime
 
 
-def _gather_confounds(signals=None, dvars=None, fdisp=None,
+def _gather_confounds(signals=None, dvars=None, std_dvars=None, fdisp=None,
                       tcompcor=None, acompcor=None, cos_basis=None,
                       motion=None, aroma=None, newpath=None):
     """
@@ -133,16 +137,16 @@ def _gather_confounds(signals=None, dvars=None, fdisp=None,
     >>> from tempfile import TemporaryDirectory
     >>> tmpdir = TemporaryDirectory()
     >>> os.chdir(tmpdir.name)
-    >>> pd.DataFrame({'a': [0.1]}).to_csv('signals.tsv', index=False, na_rep='n/a')
-    >>> pd.DataFrame({'b': [0.2]}).to_csv('dvars.tsv', index=False, na_rep='n/a')
+    >>> pd.DataFrame({'Global Signal': [0.1]}).to_csv('signals.tsv', index=False, na_rep='n/a')
+    >>> pd.DataFrame({'stdDVARS': [0.2]}).to_csv('dvars.tsv', index=False, na_rep='n/a')
     >>> out_file, confound_list = _gather_confounds('signals.tsv', 'dvars.tsv')
     >>> confound_list
     ['Global signals', 'DVARS']
 
     >>> pd.read_csv(out_file, sep='\s+', index_col=None,
     ...             engine='python')  # doctest: +NORMALIZE_WHITESPACE
-         a    b
-    0  0.1  0.2
+       global_signal  std_dvars
+    0            0.1        0.2
     >>> tmpdir.cleanup()
 
 
@@ -151,6 +155,12 @@ def _gather_confounds(signals=None, dvars=None, fdisp=None,
     def less_breakable(a_string):
         ''' hardens the string to different envs (i.e. case insensitive, no whitespace, '#' '''
         return ''.join(a_string.split()).strip('#')
+
+    # Taken from https://stackoverflow.com/questions/1175208/
+    # If we end up using it more than just here, probably worth pulling in a well-tested package
+    def camel_to_snake(name):
+        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
     def _adjust_indices(left_df, right_df):
         # This forces missing values to appear at the beggining of the DataFrame
@@ -166,6 +176,7 @@ def _gather_confounds(signals=None, dvars=None, fdisp=None,
     all_files = []
     confounds_list = []
     for confound, name in ((signals, 'Global signals'),
+                           (std_dvars, 'Standardized DVARS'),
                            (dvars, 'DVARS'),
                            (fdisp, 'Framewise displacement'),
                            (tcompcor, 'tCompCor'),
@@ -182,7 +193,7 @@ def _gather_confounds(signals=None, dvars=None, fdisp=None,
     for file_name in all_files:  # assumes they all have headings already
         new = pd.read_csv(file_name, sep="\t")
         for column_name in new.columns:
-            new.rename(columns={column_name: less_breakable(column_name)},
+            new.rename(columns={column_name: camel_to_snake(less_breakable(column_name))},
                        inplace=True)
 
         _adjust_indices(confounds_data, new)
@@ -198,7 +209,7 @@ def _gather_confounds(signals=None, dvars=None, fdisp=None,
     return combined_out, confounds_list
 
 
-def _get_ica_confounds(ica_out_dir, newpath=None):
+def _get_ica_confounds(ica_out_dir, skip_vols, newpath=None):
     if newpath is None:
         newpath = os.getcwd()
 
@@ -210,19 +221,20 @@ def _get_ica_confounds(ica_out_dir, newpath=None):
     melodic_mix_out = os.path.join(newpath, 'MELODICmix.tsv')
     motion_ics_out = os.path.join(newpath, 'AROMAnoiseICs.csv')
 
-    # melodic_mix replace spaces with tabs
-    with open(melodic_mix, 'r') as melodic_file:
-        melodic_mix_out_char = melodic_file.read().replace('  ', '\t')
-    # write to output file
-    with open(melodic_mix_out, 'w+') as melodic_file_out:
-        melodic_file_out.write(melodic_mix_out_char)
-
     # copy metion_ics file to derivatives name
     shutil.copyfile(motion_ics, motion_ics_out)
 
     # -1 since python lists start at index 0
     motion_ic_indices = np.loadtxt(motion_ics, dtype=int, delimiter=',', ndmin=1) - 1
     melodic_mix_arr = np.loadtxt(melodic_mix, ndmin=2)
+
+    # pad melodic_mix_arr with rows of zeros corresponding to number non steadystate volumes
+    if skip_vols > 0:
+        zeros = np.zeros([skip_vols, melodic_mix_arr.shape[1]])
+        melodic_mix_arr = np.vstack([zeros, melodic_mix_arr])
+
+    # save melodic_mix_arr
+    np.savetxt(melodic_mix_out, melodic_mix_arr, delimiter='\t')
 
     # Return dummy list of ones if no noise compnents were found
     if motion_ic_indices.size == 0:
@@ -243,7 +255,7 @@ def _get_ica_confounds(ica_out_dir, newpath=None):
     # add one to motion_ic_indices to match melodic report.
     aroma_confounds = os.path.join(newpath, "AROMAAggrCompAROMAConfounds.tsv")
     pd.DataFrame(aggr_confounds.T,
-                 columns=['AROMAAggrComp%02d' % (x + 1) for x in motion_ic_indices]).to_csv(
+                 columns=['aroma_motion_%02d' % (x + 1) for x in motion_ic_indices]).to_csv(
         aroma_confounds, sep="\t", index=None)
 
     return aroma_confounds, motion_ics_out, melodic_mix_out

@@ -68,7 +68,15 @@ arguments in a ``docker`` command::
         -v $HOME/projects/fmriprep/fmriprep:/usr/local/miniconda/lib/python3.6/site-packages/fmriprep:ro --entrypoint=bash \
         poldracklab/fmriprep:latest
 
-Patching containers can be achieved in Singularity by using the PYTHONPATH variable: ::
+Patching containers can be achieved in Singularity analogous to ``docker``
+using the ``--bind`` (``-B``) option: ::
+
+    $ singularity run \
+        -B $HOME/projects/fmriprep/fmriprep:/usr/local/miniconda/lib/python3.6/site-packages/fmriprep \
+        fmriprep.img \
+        /scratch/dataset /scratch/out participant -w /out/work/
+
+Or you can patch Singularity containers using the PYTHONPATH variable: ::
 
    $ PYTHONPATH="$HOME/projects/fmriprep" singularity run fmriprep.img \
         /scratch/dataset /scratch/out participant -w /out/work/
@@ -84,8 +92,8 @@ The image `must be rebuilt <#rebuilding-docker-image>`_ after any
 dependency changes.
 
 Python dependencies should generally be included in the ``REQUIRES``
-list in `fmriprep/info.py
-<https://github.com/poldracklab/fmriprep/blob/29133e5e9f92aae4b23dd897f9733885a60be311/fmriprep/info.py#L46-L61>`_.
+list in `fmriprep/__about__.py
+<https://github.com/poldracklab/fmriprep/blob/510f28db4aab8a6adde0ccadeba2da7d78ed696e/fmriprep/__about__.py#L87-L107>`_.
 If the latest version in `PyPI <https://pypi.org/>`_ is sufficient,
 then no further action is required.
 
@@ -156,4 +164,3 @@ An example of how this works is shown here: ::
     parameters) are estimated before any spatiotemporal filtering using
     `mcflirt` [FSL {fsl_ver}, @mcflirt].
     """.format(fsl_ver=fsl.Info().version() or '<ver>')
-

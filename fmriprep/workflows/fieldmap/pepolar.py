@@ -14,11 +14,11 @@ import pkg_resources as pkgr
 
 from nipype.pipeline import engine as pe
 from nipype.interfaces import afni, ants, fsl, utility as niu
+from niworkflows.engine.workflows import LiterateWorkflow as Workflow
 from niworkflows.interfaces import CopyHeader
+from niworkflows.interfaces.freesurfer import StructuralReference
 from niworkflows.interfaces.registration import ANTSApplyTransformsRPT
 
-from ...engine import Workflow
-from ...interfaces import StructuralReference
 from ..bold.util import init_enhance_and_skullstrip_bold_wf
 
 
@@ -105,7 +105,7 @@ def init_pepolar_unwarp_wf(bold_meta, epi_fmaps, omp_nthreads=1,
 A deformation field to correct for susceptibility distortions was estimated
 based on two echo-planar imaging (EPI) references with opposing phase-encoding
 directions, using `3dQwarp` @afni (AFNI {afni_ver}).
-""".format(afni_ver=''.join(list(afni.QwarpPlusMinus().version or '<ver>')))
+""".format(afni_ver=''.join(['%02d' % v for v in afni.Info().version() or []]))
 
     inputnode = pe.Node(niu.IdentityInterface(
         fields=['in_reference', 'in_reference_brain', 'in_mask']), name='inputnode')
