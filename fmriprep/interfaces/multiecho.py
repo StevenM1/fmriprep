@@ -17,13 +17,62 @@ Change directory to provide relative paths for doctests
 """
 import os
 from nibabel.filename_parser import splitext_addext
+import numpy as np
 
 from nipype import logging
 from nipype.interfaces.base import (
+    SimpleInterface, BaseInterfaceInputSpec,
     traits, TraitedSpec, File,
     CommandLine, CommandLineInputSpec)
 
 LOGGER = logging.getLogger('nipype.interface')
+
+### SM re-added this interface
+ class FirstEchoInputSpec(BaseInterfaceInputSpec):
+    in_files = traits.List(File(exists=True), mandatory=True, minlen=3,
+                           desc='multi-echo BOLD EPIs')
+    ref_imgs = traits.List(File(exists=True), mandatory=True, minlen=3,
+                           desc='generated reference image for each '
+                           'multi-echo BOLD EPI')
+    te_list = traits.List(traits.Float, mandatory=True, desc='echo times')
+
+
+class FirstEchoOutputSpec(TraitedSpec):
+    first_image = File(exists=True,
+                       desc='BOLD EPI series for the first echo')
+    first_ref_image = File(exists=True, desc='generated reference image for '
+                                             'the first echo')
+
+
+class FirstEcho(SimpleInterface):
+    """
+    Finds the first echo in a multi-echo series and its associated reference
+    image.
+    Example
+    =======
+    >>> from fmriprep.interfaces import multiecho
+    >>> first_echo = multiecho.FirstEcho()
+    >>> first_echo.inputs.in_files = ['sub-01_run-01_echo-1_bold.nii.gz', \
+                                      'sub-01_run-01_echo-2_bold.nii.gz', \
+                                      'sub-01_run-01_echo-3_bold.nii.gz']
+    >>> first_echo.inputs.ref_imgs = ['sub-01_run-01_echo-1_bold.nii.gz', \
+                                      'sub-01_run-01_echo-2_bold.nii.gz', \
+                                      'sub-01_run-01_echo-3_bold.nii.gz']
+    >>> first_echo.inputs.te_list = [0.013, 0.027, 0.043]
+    >>> res = first_echo.run()
+    >>> res.outputs.first_image
+    'sub-01_run-01_echo-1_bold.nii.gz'
+    >>> res.outputs.first_ref_image
+    'sub-01_run-01_echo-1_bold.nii.gz'
+    """
+    input_spec = FirstEchoInputSpec
+    output_spec = FirstEchoOutputSpec
+
+    def _run_interface(self, runtime):
+        self._results['first_image'] = self.inputs.in_files[np.argmin(self.inputs.te_list)]
+        self._results['first_ref_image'] = self.inputs.ref_imgs[np.argmin(self.inputs.te_list)]
+
+        return runtime
 
 
 class T2SMapInputSpec(CommandLineInputSpec):
