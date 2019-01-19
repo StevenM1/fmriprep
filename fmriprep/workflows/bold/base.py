@@ -422,7 +422,14 @@ Non-gridded (surface) resamplings were performed using `mri_vol2surf`
     bold_t1_trans_wf = init_bold_t1_trans_wf(name='bold_t1_trans_wf',
                                              freesurfer=freesurfer,
                                              use_fieldwarp=(fmaps is not None or use_syn),
-                                             multiecho=multiecho,
+                                             ### SM: we're setting multiecho to False here ALWAYS: this Node assumes
+                                             # that it receives an optimally combined, head-motion corrected data
+                                             # file (single file, non-splitted) if multi-echo data is used.
+                                             # However, since we treat all echos semi-indepdently, we need this
+                                             # module to apply the t1 transformation to *each echo*, and thus tell it
+                                             #  we're dealing with non-multi echo data.
+                                             multiecho=False,
+                                             # multiecho=multiecho,
                                              mem_gb=mem_gb['resampled'],
                                              omp_nthreads=omp_nthreads,
                                              use_compression=False)
