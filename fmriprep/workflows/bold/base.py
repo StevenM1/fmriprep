@@ -27,7 +27,6 @@ from ...utils.meepi import combine_meepi_source
 
 from ...interfaces import (
     DerivativesDataSink,
-    GiftiNameSource,
     FirstEcho
 )
 from ...interfaces.reports import FunctionalSummary
