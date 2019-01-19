@@ -20,15 +20,14 @@ from nibabel.filename_parser import splitext_addext
 import numpy as np
 
 from nipype import logging
-from nipype.interfaces.base import (
-    SimpleInterface, BaseInterfaceInputSpec,
-    traits, TraitedSpec, File,
-    CommandLine, CommandLineInputSpec)
+from nipype.interfaces.base import (SimpleInterface, BaseInterfaceInputSpec, traits, TraitedSpec, File, CommandLine,
+                                    CommandLineInputSpec)
 
 LOGGER = logging.getLogger('nipype.interface')
 
+
 ### SM re-added this interface
- class FirstEchoInputSpec(BaseInterfaceInputSpec):
+class FirstEchoInputSpec(BaseInterfaceInputSpec):
     in_files = traits.List(File(exists=True), mandatory=True, minlen=3,
                            desc='multi-echo BOLD EPIs')
     ref_imgs = traits.List(File(exists=True), mandatory=True, minlen=3,
