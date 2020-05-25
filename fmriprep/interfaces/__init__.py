@@ -8,7 +8,7 @@ from niworkflows.interfaces import (
 from .reports import SubjectSummary, FunctionalSummary, AboutSummary
 from .fmap import FieldEnhance, FieldToRadS, FieldToHz, Phasediff2Fieldmap
 from .confounds import GatherConfounds, ICAConfounds, FMRISummary
-from .multiecho import T2SMap
+from .multiecho import T2SMap, FirstEcho
 
 
 class DerivativesDataSink(bids.DerivativesDataSink):
