@@ -1,5 +1,12 @@
 .. include:: links.rst
 
+This is an adjusted version of fmriprep 1.2.6. 
+==============================================
+It processes each echo of data from a multi-echo protocol individually. The first echo is used to estimate head motion correction parameters that are applied to all echoes
+This pipeline was used for a 7 T protocol comparsion paper:
+Miletic, Bazin, Weiskopf, Van der Zwaag, Forstmann & Trampel (2020). fMRI protocol optimization for simultaneously studying small subcortical and cortical areas at 7 T. NeuroImage
+
+
 fmriprep: A Robust Preprocessing Pipeline for fMRI Data
 =======================================================
 
